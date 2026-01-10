@@ -5,9 +5,7 @@ description = "Create and process micro:bit Universal Hex files"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"
-authors = [
-    { name = "Micro:bit Educational Foundation" }
-]
+authors = [{ name = "Carlos Pereira Atencio", email = "carlosperate@embeddedlog.com" }]
 keywords = ["microbit", "hex", "intel-hex", "universal-hex"]
 classifiers = [
     "Development Status :: 3 - Alpha",
