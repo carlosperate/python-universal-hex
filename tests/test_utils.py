@@ -5,10 +5,10 @@ Tests for utilities.
 import pytest
 
 from universal_hex.utils import (
-    hex_to_bytes,
     byte_to_hex,
     bytes_to_hex,
     concat_bytes,
+    hex_to_bytes,
 )
 
 

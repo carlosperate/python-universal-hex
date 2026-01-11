@@ -28,16 +28,55 @@ Repository = "https://github.com/carlosperate/python-universal-hex"
 requires = ["uv_build>=0.9.24"]
 build-backend = "uv_build"
 
+[dependency-groups]
+dev = [
+    "mypy>=1.0.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.8.0",
+]
+
 [tool.uv]
 package = true
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_functions = ["test_*"]
+[tool.coverage.run]
+source = ["src/universal_hex/"]
+branch = true
 
-[dependency-groups]
-dev = [
-    "pytest>=8.0.0",
-    "pytest-cov>=4.0.0",
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
 ]
+
+[tool.ruff.lint.isort]
+known-first-party = ["universal_hex"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+strict = true
+files = ["src", "tests"]
+exclude = ["^\\.venv"]
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["pytest.*", "_pytest.*"]
+ignore_missing_imports = true
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "conftest"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false

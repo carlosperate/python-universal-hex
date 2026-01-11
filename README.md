@@ -71,7 +71,7 @@ uv sync
 uv run pytest
 
 # Run tests with coverage
-uv run pytest --cov=universal_hex
+uv run pytest --cov --cov-report=term-missing
 ```
 
 ## License

@@ -13,18 +13,17 @@ from universal_hex import (
     BoardId,
     IndividualHex,
     create_uhex,
-    separate_uhex,
     is_uhex,
+    separate_uhex,
 )
 from universal_hex.ihex import RecordType, get_record_type, split_ihex_into_records
 from universal_hex.uhex import (
+    _ihex_to_uhex_blocks,
+    _ihex_to_uhex_sections,
     _is_makecode_v1,
     _is_makecode_v1_records,
     _is_uhex_records,
-    _ihex_to_uhex_blocks,
-    _ihex_to_uhex_sections,
 )
-
 
 # Load test fixture files
 HEX_PATH = Path(__file__).parent / "hex-files"
@@ -33,7 +32,9 @@ hex216 = (HEX_PATH / "2-ghost-music-16.hex").read_text()
 hex132 = (HEX_PATH / "1-duck-umbrella-32.hex").read_text()
 hex232 = (HEX_PATH / "2-ghost-music-32.hex").read_text()
 hex_combined_blocks = (HEX_PATH / "combined-16-blocks-1-9901-2-9903.hex").read_text()
-hex_combined_sections = (HEX_PATH / "combined-32-sections-1-9901-2-9903.hex").read_text()
+hex_combined_sections = (
+    HEX_PATH / "combined-32-sections-1-9901-2-9903.hex"
+).read_text()
 hex_python_editor_universal = (HEX_PATH / "python-editor-universal.hex").read_text()
 # MakeCode Intel Hex files (pre-V2 micro:bit, not Universal Hex)
 hex_makecode_v1_intel = (HEX_PATH / "makecode-v1-intel.hex").read_text()
@@ -158,13 +159,17 @@ class TestCreateUhex:
         )
         normal_hex_win = normal_hex.replace("\n", "\r\n")
 
-        result_single = create_uhex([
-            IndividualHex(hex=normal_hex_win, board_id=0x9903),
-        ])
-        result_double = create_uhex([
-            IndividualHex(hex=normal_hex_win, board_id=0x9900),
-            IndividualHex(hex=normal_hex, board_id=0x9903),
-        ])
+        result_single = create_uhex(
+            [
+                IndividualHex(hex=normal_hex_win, board_id=0x9903),
+            ]
+        )
+        result_double = create_uhex(
+            [
+                IndividualHex(hex=normal_hex_win, board_id=0x9900),
+                IndividualHex(hex=normal_hex, board_id=0x9903),
+            ]
+        )
 
         assert result_single.endswith(":00000001FF\n")
         assert result_double.endswith(":00000001FF\n")
@@ -190,10 +195,12 @@ class TestCreateUhex:
         )
 
         with pytest.raises(ValueError, match="EoF record found at record"):
-            create_uhex([
-                IndividualHex(hex=hex_with_eof, board_id=0x9900),
-                IndividualHex(hex=normal_hex, board_id=0x9903),
-            ])
+            create_uhex(
+                [
+                    IndividualHex(hex=hex_with_eof, board_id=0x9900),
+                    IndividualHex(hex=normal_hex, board_id=0x9903),
+                ]
+            )
 
     def test_universal_hex_input_throws_error(self):
         normal_hex = (
@@ -229,10 +236,12 @@ class TestCreateUhex:
         )
 
         with pytest.raises(ValueError, match="already a Universal Hex"):
-            create_uhex([
-                IndividualHex(hex=universal_hex, board_id=0x9900),
-                IndividualHex(hex=normal_hex, board_id=0x9903),
-            ])
+            create_uhex(
+                [
+                    IndividualHex(hex=universal_hex, board_id=0x9900),
+                    IndividualHex(hex=normal_hex, board_id=0x9903),
+                ]
+            )
 
 
 class TestSeparateUhex:
@@ -436,12 +445,14 @@ class TestLoopbackUhex:
         hex_str_win = hex_str.replace("\n", "\r\n")
 
         # Create universal hex from multiple boards
-        universal_hex = create_uhex([
-            IndividualHex(hex=hex_str, board_id=0x9901),
-            IndividualHex(hex=hex_str_win, board_id=0x9902),
-            IndividualHex(hex=hex_str, board_id=0x9903),
-            IndividualHex(hex=hex_str_win, board_id=0x9904),
-        ])
+        universal_hex = create_uhex(
+            [
+                IndividualHex(hex=hex_str, board_id=0x9901),
+                IndividualHex(hex=hex_str_win, board_id=0x9902),
+                IndividualHex(hex=hex_str, board_id=0x9903),
+                IndividualHex(hex=hex_str_win, board_id=0x9904),
+            ]
+        )
 
         # Separate back
         result = separate_uhex(universal_hex)
@@ -452,10 +463,12 @@ class TestLoopbackUhex:
         assert result[3].hex == hex_str
 
     def test_from_full_makecode_files_sections(self):
-        universal_hex = create_uhex([
-            IndividualHex(hex=hex132, board_id=0x9901),
-            IndividualHex(hex=hex232, board_id=0x9903),
-        ])
+        universal_hex = create_uhex(
+            [
+                IndividualHex(hex=hex132, board_id=0x9901),
+                IndividualHex(hex=hex232, board_id=0x9903),
+            ]
+        )
 
         assert universal_hex == hex_combined_sections
 
@@ -509,8 +522,8 @@ class TestBoardId:
     """Test BoardId enum."""
 
     def test_board_id_values(self):
-        assert BoardId.V1 == 0x9900
-        assert BoardId.V2 == 0x9903
+        assert int(BoardId.V1) == 0x9900
+        assert int(BoardId.V2) == 0x9903
 
 
 class TestIndividualHex:
@@ -672,12 +685,10 @@ class TestMakeCodeV1Detection:
 
     def test_hex_without_eof_is_not_makecode(self):
         """Test that hex without EoF record is not detected as MakeCode."""
-        no_eof_hex = (
-            ":020000040000FA\n"
-            ":1000000000400020218E01005D8E01005F8E010006\n"
-        )
+        no_eof_hex = ":020000040000FA\n:1000000000400020218E01005D8E01005F8E010006\n"
 
         assert _is_makecode_v1(no_eof_hex) is False
+
 
 class TestExtendedSegmentAddress:
     """Test handling of Extended Segment Address records."""
@@ -733,12 +744,13 @@ class TestExtendedSegmentAddress:
         large_hex = f":020000040000FA\n{data_records}\n:00000001FF\n"
 
         # Fix checksums - just use a simpler approach
+        def make_record(i: int) -> str:
+            checksum = (256 - (16 + (i >> 4) + (i & 0xF) + (i >> 8))) & 0xFF
+            return f":100{i:03X}00{'00' * 16}{checksum:02X}"
+
         large_hex = (
             ":020000040000FA\n"
-            + "\n".join(
-                f":100{i:03X}00{'00' * 16}{(256 - (16 + (i >> 4) + (i & 0xF) + (i >> 8))) & 0xFF:02X}"
-                for i in range(0, 256, 16)
-            )
+            + "\n".join(make_record(i) for i in range(0, 256, 16))
             + "\n:00000001FF\n"
         )
 
@@ -793,6 +805,7 @@ class TestMakeCodeFixtureFiles:
         for ihex in result:
             assert_valid_ihex(ihex.hex)
 
+
 class TestInternalFunctions:
     """Test internal functions for edge cases and coverage."""
 
@@ -828,14 +841,14 @@ class TestInternalFunctions:
             )
 
     def test_separate_uhex_ext_linear_not_followed_by_block_start(self):
-        """Test separate_uhex when ExtendedLinearAddress is not followed by BlockStart."""
+        """Test separate_uhex with ExtendedLinearAddress not followed by BlockStart."""
         # Create a Universal Hex where an ExtendedLinearAddress appears mid-section
         # (not at the start of a new block)
         uhex_with_mid_ext_lin = (
             ":020000040000FA\n"  # Extended Linear Address
             ":0400000A9900C0DEBB\n"  # Block Start for board 0x9900
             ":1000000000400020218E01005D8E01005F8E010006\n"  # Data
-            ":020000040001F9\n"  # Extended Linear Address mid-section (NOT followed by BlockStart)
+            ":020000040001F9\n"  # Extended Linear Address mid-section
             ":1000000011111111111111111111111111111111EF\n"  # More data
             ":0000000BF5\n"  # Block End
             ":00000001FF\n"  # End of File

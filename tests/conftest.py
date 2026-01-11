@@ -14,8 +14,10 @@ def hex_files_dir() -> Path:
 @pytest.fixture
 def load_hex_file(hex_files_dir: Path):
     """Factory fixture to load hex files by name."""
+
     def _load(filename: str) -> str:
         filepath = hex_files_dir / filename
         # Read as binary first to preserve exact line endings for comparison
         return filepath.read_text(encoding="ascii")
+
     return _load

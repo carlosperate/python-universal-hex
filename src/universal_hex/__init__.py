@@ -11,8 +11,8 @@ from .uhex import (
     BoardId,
     IndividualHex,
     create_uhex,
-    separate_uhex,
     is_uhex,
+    separate_uhex,
 )
 
 __version__ = "0.1.0"

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import List, NamedTuple
+from typing import NamedTuple, TypedDict
 
 from . import ihex
 
@@ -29,7 +29,7 @@ V1_BOARD_IDS = (0x9900, 0x9901)
 BLOCK_SIZE = 512
 
 
-def _is_uhex_records(records: List[str]) -> bool:
+def _is_uhex_records(records: list[str]) -> bool:
     """Check if records belong to a Universal Hex.
 
     :param records: List of hex record strings.
@@ -44,7 +44,7 @@ def _is_uhex_records(records: List[str]) -> bool:
     )
 
 
-def _is_makecode_v1_records(records: List[str]) -> bool:
+def _is_makecode_v1_records(records: list[str]) -> bool:
     """Check if records belong to a MakeCode V1 Intel Hex file.
 
     :param records: List of hex record strings.
@@ -114,7 +114,7 @@ def _ihex_to_uhex_blocks(hex_str: str, board_id: int) -> str:
 
     # Each loop iteration corresponds to a 512-bytes block
     ih = 0
-    block_lines: List[str] = []
+    block_lines: list[str] = []
 
     while ih < len(hex_records):
         block_len = 0
@@ -135,7 +135,9 @@ def _ihex_to_uhex_blocks(hex_str: str, board_id: int) -> str:
         block_len += end_record_base_len  # Reserve space for block end
 
         end_of_file = False
-        while ih < len(hex_records) and BLOCK_SIZE >= block_len + len(hex_records[ih]) + 1:
+        while ih < len(hex_records):
+            if block_len + len(hex_records[ih]) + 1 > BLOCK_SIZE:
+                break
             record = hex_records[ih]
             ih += 1
             record_type = ihex.get_record_type(record)
@@ -196,7 +198,7 @@ def _ihex_to_uhex_sections(hex_str: str, board_id: int) -> str:
     :returns: Universal Hex formatted string with 512-byte aligned sections.
     :raises ValueError: If the input is invalid.
     """
-    section_lines: List[str] = []
+    section_lines: list[str] = []
     section_len = 0
 
     def add_record_length(record: str) -> None:
@@ -287,7 +289,7 @@ def _ihex_to_uhex_sections(hex_str: str, board_id: int) -> str:
     return "\n".join(section_lines)
 
 
-def create_uhex(hexes: List[IndividualHex], blocks: bool = False) -> str:
+def create_uhex(hexes: list[IndividualHex], blocks: bool = False) -> str:
     """Create a Universal Hex from multiple Intel Hex files.
 
     :param hexes: List of IndividualHex tuples, each containing hex content
@@ -303,7 +305,7 @@ def create_uhex(hexes: List[IndividualHex], blocks: bool = False) -> str:
     ihex_to_custom_format = _ihex_to_uhex_blocks if blocks else _ihex_to_uhex_sections
     eof_nl_record = ihex.eof_record() + "\n"
 
-    custom_hexes: List[str] = []
+    custom_hexes: list[str] = []
 
     # Process all but the last hex, removing EoF if present
     for i in range(len(hexes) - 1):
@@ -313,9 +315,7 @@ def create_uhex(hexes: List[IndividualHex], blocks: bool = False) -> str:
         custom_hexes.append(custom_hex)
 
     # Process the last hex with guaranteed EoF
-    last_custom_hex = ihex_to_custom_format(
-        hexes[-1].hex, hexes[-1].board_id
-    )
+    last_custom_hex = ihex_to_custom_format(hexes[-1].hex, hexes[-1].board_id)
     custom_hexes.append(last_custom_hex)
     if not last_custom_hex.endswith(eof_nl_record):
         custom_hexes.append(eof_nl_record)
@@ -323,7 +323,7 @@ def create_uhex(hexes: List[IndividualHex], blocks: bool = False) -> str:
     return "".join(custom_hexes)
 
 
-def separate_uhex(uhex: str) -> List[IndividualHex]:
+def separate_uhex(uhex: str) -> list[IndividualHex]:
     """Separate a Universal Hex into individual Intel Hex files.
 
     :param uhex: A Universal Hex file string.
@@ -345,8 +345,13 @@ def separate_uhex(uhex: str) -> List[IndividualHex]:
         ihex.RecordType.StartSegmentAddress,
     }
 
+    class _HexEntry(TypedDict):
+        board_id: int
+        last_ext_addr: str
+        hex: list[str]
+
     # Dictionary to hold hexes by board ID
-    hexes: dict[int, dict] = {}
+    hexes: dict[int, _HexEntry] = {}
     current_board_id = 0
 
     for i, record in enumerate(records):
@@ -382,7 +387,7 @@ def separate_uhex(uhex: str) -> List[IndividualHex]:
                 hexes[current_board_id]["hex"].append(record)
 
     # Build return list
-    result: List[IndividualHex] = []
+    result: list[IndividualHex] = []
     eof = ihex.eof_record()
     for board_id in hexes:
         hex_list = hexes[board_id]["hex"]
@@ -425,10 +430,7 @@ def is_uhex(hex_str: str) -> bool:
 
     # Check the beginning of Block Start record
     block_start_beginning = ":0400000A"
-    if hex_str[i : i + len(block_start_beginning)] != block_start_beginning:
-        return False
-
-    return True
+    return hex_str[i : i + len(block_start_beginning)] == block_start_beginning
 
 
 def _is_makecode_v1(hex_str: str) -> bool:

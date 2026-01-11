@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import List
 
-from .utils import bytes_to_hex, byte_to_hex, hex_to_bytes, concat_bytes
-
+from .utils import byte_to_hex, bytes_to_hex, concat_bytes, hex_to_bytes
 
 # Maximum data bytes per record (DAPLink doesn't support more than 32)
 RECORD_DATA_MAX_BYTES = 32
@@ -322,7 +320,8 @@ def convert_ext_seg_to_lin_address(record: str) -> str:
     """
     segment_address = get_record_data(record)
 
-    # Must be exactly 2 bytes, high nibble of first byte must be 0, second byte must be 0
+    # Must be exactly 2 bytes, high nibble of first byte must be 0,
+    # second byte must be 0
     if (
         len(segment_address) != 2
         or (segment_address[0] & 0x0F) != 0  # Only multiples of 0x1000
@@ -334,7 +333,7 @@ def convert_ext_seg_to_lin_address(record: str) -> str:
     return ext_lin_address_record(start_address)
 
 
-def split_ihex_into_records(hex_str: str) -> List[str]:
+def split_ihex_into_records(hex_str: str) -> list[str]:
     """Split an Intel HEX file string into individual records.
 
     Handles various line endings (\\n, \\r\\n, \\r).

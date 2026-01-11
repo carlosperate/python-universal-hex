@@ -9,20 +9,19 @@ import pytest
 
 from universal_hex.ihex import (
     RecordType,
-    Record,
+    block_end_record,
+    block_start_record,
+    convert_ext_seg_to_lin_address,
+    convert_record_to,
     create_record,
-    get_record_type,
-    get_record_data,
-    parse_record,
     eof_record,
     ext_lin_address_record,
-    block_start_record,
-    block_end_record,
-    padded_data_record,
-    convert_record_to,
-    convert_ext_seg_to_lin_address,
-    split_ihex_into_records,
     find_data_field_length,
+    get_record_data,
+    get_record_type,
+    padded_data_record,
+    parse_record,
+    split_ihex_into_records,
 )
 
 
@@ -33,24 +32,27 @@ class TestCreateRecordStandard:
         a = [0x64, 0x27, 0x00, 0x20, 0x03, 0x4B, 0x19, 0x60]
         b = [0x43, 0x68, 0x03, 0x49, 0x9B, 0x00, 0x5A, 0x50]
         # Examples taken from a random micro:bit hex file
-        assert create_record(
-            RecordType.Data, 0x4290, bytes(a + b)
-        ) == ":1042900064270020034B1960436803499B005A5070"
+        assert (
+            create_record(RecordType.Data, 0x4290, bytes(a + b))
+            == ":1042900064270020034B1960436803499B005A5070"
+        )
 
         a = [0x12, 0xF0, 0xD0, 0xFB, 0x07, 0xEE, 0x90, 0x0A, 0xF5, 0xEE, 0xC0]
         b = [0x7A, 0xF1, 0xEE, 0x10, 0xFA, 0x44, 0xBF, 0x9F, 0xED, 0x08, 0x7A]
         c = [0x77, 0xEE, 0x87, 0x7A, 0xFD, 0xEE, 0xE7, 0x7A, 0x17, 0xEE]
-        assert create_record(
-            RecordType.Data, 0x07E0, bytes(a + b + c)
-        ) == ":2007E00012F0D0FB07EE900AF5EEC07AF1EE10FA44BF9FED087A77EE877AFDEEE77A17EECF"
+        assert create_record(RecordType.Data, 0x07E0, bytes(a + b + c)) == (
+            ":2007E00012F0D0FB07EE900AF5EEC07AF1EE10FA44BF9FED087A77EE877AFDEEE77A17EECF"
+        )
 
-        assert create_record(
-            RecordType.Data, 0xF870, bytes([0x00, 0x00, 0x00, 0x00])
-        ) == ":04F870000000000094"
+        assert (
+            create_record(RecordType.Data, 0xF870, bytes([0x00, 0x00, 0x00, 0x00]))
+            == ":04F870000000000094"
+        )
 
-        assert create_record(
-            RecordType.Data, 0xE7D4, bytes([0x0C, 0x1A, 0xFF, 0x7F, 0x01, 0x00, 0x00, 0x00])
-        ) == ":08E7D4000C1AFF7F0100000098"
+        data = bytes([0x0C, 0x1A, 0xFF, 0x7F, 0x01, 0x00, 0x00, 0x00])
+        assert create_record(RecordType.Data, 0xE7D4, data) == (
+            ":08E7D4000C1AFF7F0100000098"
+        )
 
     def test_creates_end_of_file_record(self):
         assert create_record(RecordType.EndOfFile, 0, b"") == ":00000001FF"
@@ -80,9 +82,10 @@ class TestCreateRecordCustom:
     """Test create_record() for custom records."""
 
     def test_creates_custom_block_start_record(self):
-        assert create_record(
-            RecordType.BlockStart, 0, bytes([0x99, 0x01, 0xC0, 0xDE])
-        ) == ":0400000A9901C0DEBA"
+        assert (
+            create_record(RecordType.BlockStart, 0, bytes([0x99, 0x01, 0xC0, 0xDE]))
+            == ":0400000A9901C0DEBA"
+        )
 
 
 class TestGetRecordTypeStandard:
@@ -102,17 +105,21 @@ class TestGetRecordTypeCustom:
         assert get_record_type(":0400000A9901C0DEBA") == RecordType.BlockStart
 
     def test_detects_block_end_record(self):
-        assert get_record_type(":0C00000BFFFFFFFFFFFFFFFFFFFFFFFFF5") == RecordType.BlockEnd
+        record = ":0C00000BFFFFFFFFFFFFFFFFFFFFFFFFF5"
+        assert get_record_type(record) == RecordType.BlockEnd
         assert get_record_type(":0000000BF5") == RecordType.BlockEnd
 
     def test_detects_padded_data_record(self):
-        assert get_record_type(":1000000CFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF4") == RecordType.PaddedData
+        record = ":1000000CFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF4"
+        assert get_record_type(record) == RecordType.PaddedData
 
     def test_detects_custom_data_record(self):
-        assert get_record_type(":102AA00D34000F2D03653A35000C2D03653A3600C1") == RecordType.CustomData
+        record = ":102AA00D34000F2D03653A35000C2D03653A3600C1"
+        assert get_record_type(record) == RecordType.CustomData
 
     def test_detects_other_data_record(self):
-        assert get_record_type(":1002800EE4EA519366D2B52AA5EE1DBDD0414C5578") == RecordType.OtherData
+        record = ":1002800EE4EA519366D2B52AA5EE1DBDD0414C5578"
+        assert get_record_type(record) == RecordType.OtherData
 
     def test_throws_error_with_invalid_record_type(self):
         with pytest.raises(ValueError, match="is not valid"):
@@ -129,10 +136,13 @@ class TestGetRecordData:
         assert get_record_data(":0400000A9903C0DEB8") == bytes([0x99, 0x03, 0xC0, 0xDE])
 
     def test_get_data_from_half_padding_record(self):
-        assert get_record_data(":1080B00DFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC3") == bytes([0xFF] * 16)
+        record = ":1080B00DFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC3"
+        assert get_record_data(record) == bytes([0xFF] * 16)
 
     def test_get_data_from_full_padding_record(self):
-        record = ":1080B00DFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC3"
+        record = (  # noqa: E501
+            ":1080B00DFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC3"
+        )
         assert get_record_data(record) == bytes([0xFF] * 32)
 
     def test_empty_bytes_when_record_too_short(self):
@@ -314,15 +324,21 @@ class TestConvertRecordTo:
     """Test convert_record_to()."""
 
     def test_converts_data_record_to_custom_data_record(self):
-        assert convert_record_to(
-            ":105D3000E060E3802046FFF765FF0123A1881A4653",
-            RecordType.CustomData,
-        ) == ":105D300DE060E3802046FFF765FF0123A1881A4646"
+        assert (
+            convert_record_to(
+                ":105D3000E060E3802046FFF765FF0123A1881A4653",
+                RecordType.CustomData,
+            )
+            == ":105D300DE060E3802046FFF765FF0123A1881A4646"
+        )
 
-        assert convert_record_to(
-            ":10B04000D90B08BD40420F0070B5044616460D46A8",
-            RecordType.CustomData,
-        ) == ":10B0400DD90B08BD40420F0070B5044616460D469B"
+        assert (
+            convert_record_to(
+                ":10B04000D90B08BD40420F0070B5044616460D46A8",
+                RecordType.CustomData,
+            )
+            == ":10B0400DD90B08BD40420F0070B5044616460D469B"
+        )
 
 
 class TestConvertExtSegToLinAddress:
