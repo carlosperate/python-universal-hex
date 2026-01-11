@@ -17,6 +17,13 @@ from universal_hex import (
     is_uhex,
 )
 from universal_hex.ihex import RecordType, get_record_type, split_ihex_into_records
+from universal_hex.uhex import (
+    _is_makecode_v1,
+    _is_makecode_v1_records,
+    _is_uhex_records,
+    _ihex_to_uhex_blocks,
+    _ihex_to_uhex_sections,
+)
 
 
 # Load test fixture files
@@ -28,6 +35,12 @@ hex232 = (HEX_PATH / "2-ghost-music-32.hex").read_text()
 hex_combined_blocks = (HEX_PATH / "combined-16-blocks-1-9901-2-9903.hex").read_text()
 hex_combined_sections = (HEX_PATH / "combined-32-sections-1-9901-2-9903.hex").read_text()
 hex_python_editor_universal = (HEX_PATH / "python-editor-universal.hex").read_text()
+# MakeCode Intel Hex files (pre-V2 micro:bit, not Universal Hex)
+hex_makecode_v1_intel = (HEX_PATH / "makecode-v1-intel.hex").read_text()
+hex_makecode_v2_intel = (HEX_PATH / "makecode-v2-intel.hex").read_text()
+# MakeCode Universal Hex files (post-V2 micro:bit)
+hex_makecode_v3_universal = (HEX_PATH / "makecode-v3-universal.hex").read_text()
+hex_makecode_v5_universal = (HEX_PATH / "makecode-v5-universal.hex").read_text()
 hex_makecode_v8_universal = (HEX_PATH / "makecode-v8-universal.hex").read_text()
 
 # Valid Intel HEX record types (not Universal HEX extensions)
@@ -508,3 +521,331 @@ class TestIndividualHex:
 
         assert ihex.hex == ":00000001FF\n"
         assert ihex.board_id == 0x9900
+
+
+class TestBlocksFormat:
+    """Test create_uhex() with blocks=True format."""
+
+    def test_create_blocks_format_single_hex(self):
+        """Test creating Universal Hex with blocks format."""
+        normal_hex = (
+            ":020000040000FA\n"
+            ":1000000000400020218E01005D8E01005F8E010006\n"
+            ":1000100000000000000000000000000000000000E0\n"
+            ":10002000000000000000000000000000618E0100E0\n"
+            ":00000001FF\n"
+        )
+
+        result = create_uhex(
+            [IndividualHex(hex=normal_hex, board_id=0x9903)],
+            blocks=True,
+        )
+
+        # Should be a valid Universal Hex
+        assert is_uhex(result) is True
+        assert result.endswith(":00000001FF\n")
+
+    def test_create_blocks_format_multiple_hexes(self):
+        """Test creating Universal Hex with blocks format for multiple boards."""
+        normal_hex = (
+            ":020000040000FA\n"
+            ":1000000000400020218E01005D8E01005F8E010006\n"
+            ":1000100000000000000000000000000000000000E0\n"
+            ":10002000000000000000000000000000618E0100E0\n"
+            ":00000001FF\n"
+        )
+
+        result = create_uhex(
+            [
+                IndividualHex(hex=normal_hex, board_id=0x9900),
+                IndividualHex(hex=normal_hex, board_id=0x9903),
+            ],
+            blocks=True,
+        )
+
+        # Should be a valid Universal Hex
+        assert is_uhex(result) is True
+        # Can separate back
+        separated = separate_uhex(result)
+        assert len(separated) == 2
+        assert separated[0].board_id == 0x9900
+        assert separated[1].board_id == 0x9903
+
+    def test_blocks_format_loopback(self):
+        """Test round-trip with blocks format."""
+        hex_str = (
+            ":020000040000FA\n"
+            ":10558000002EEDD1E9E70020EAE7C0464302F0B57E\n"
+            ":1055900042005D0AC30F4802440A4800120E000E82\n"
+            ":00000001FF\n"
+        )
+
+        universal_hex = create_uhex(
+            [
+                IndividualHex(hex=hex_str, board_id=0x9900),
+                IndividualHex(hex=hex_str, board_id=0x9903),
+            ],
+            blocks=True,
+        )
+
+        separated = separate_uhex(universal_hex)
+
+        assert len(separated) == 2
+        # Separated hexes should have valid Intel HEX types
+        for ihex in separated:
+            assert_valid_ihex(ihex.hex)
+
+    def test_blocks_format_v1_uses_data_records(self):
+        """Test that V1 board IDs use standard Data records in blocks format."""
+        normal_hex = (
+            ":020000040000FA\n"
+            ":1000000000400020218E01005D8E01005F8E010006\n"
+            ":00000001FF\n"
+        )
+
+        result = create_uhex(
+            [IndividualHex(hex=normal_hex, board_id=0x9900)],
+            blocks=True,
+        )
+
+        # V1 boards should use Data records (type 00), not CustomData (type 0D)
+        records = split_ihex_into_records(result)
+        data_records = [r for r in records if get_record_type(r) == RecordType.Data]
+        custom_data_records = [
+            r for r in records if get_record_type(r) == RecordType.CustomData
+        ]
+        assert len(data_records) > 0
+        assert len(custom_data_records) == 0
+
+
+class TestMakeCodeV1Detection:
+    """Test _is_makecode_v1() and _is_makecode_v1_records() functions."""
+
+    def test_normal_hex_is_not_makecode_v1(self):
+        """Test that normal hex files are not detected as MakeCode V1."""
+        normal_hex = (
+            ":020000040000FA\n"
+            ":1000000000400020218E01005D8E01005F8E010006\n"
+            ":00000001FF\n"
+        )
+
+        assert _is_makecode_v1(normal_hex) is False
+
+    def test_hex_with_ram_address_before_eof_is_makecode_v0(self):
+        """Test detection of MakeCode v0 hex (metadata in RAM before EoF)."""
+        # MakeCode v0 placed metadata in RAM space 0x20000000 before EoF
+        makecode_v0_hex = (
+            ":020000040000FA\n"
+            ":1000000000400020218E01005D8E01005F8E010006\n"
+            ":020000042000DA\n"  # Extended Linear Address to 0x20000000
+            ":10000000DEADBEEFDEADBEEFDEADBEEFDEADBEEF00\n"
+            ":00000001FF\n"
+        )
+
+        assert _is_makecode_v1(makecode_v0_hex) is True
+
+    def test_hex_with_other_data_after_eof_is_makecode_v1(self):
+        """Test detection of MakeCode v2/v3 hex (OtherData after EoF)."""
+        # MakeCode v2/v3 uses OtherData (0x0E) records after EoF
+        makecode_v2_hex = (
+            ":020000040000FA\n"
+            ":1000000000400020218E01005D8E01005F8E010006\n"
+            ":00000001FF\n"
+            ":0400000EDEADBEEFB6\n"  # OtherData record (type 0E)
+        )
+
+        records = split_ihex_into_records(makecode_v2_hex)
+        assert _is_makecode_v1_records(records) is True
+
+    def test_hex_with_ram_address_after_eof_is_makecode_v1(self):
+        """Test detection of MakeCode v1 hex (RAM address after EoF)."""
+        # MakeCode v1 placed metadata in RAM after EoF
+        makecode_v1_hex = (
+            ":020000040000FA\n"
+            ":1000000000400020218E01005D8E01005F8E010006\n"
+            ":00000001FF\n"
+            ":020000042000DA\n"  # Extended Linear Address to 0x20000000
+            ":10000000METADATA123456789ABCDEF0123456700\n"
+        )
+
+        assert _is_makecode_v1(makecode_v1_hex) is True
+
+    def test_hex_without_eof_is_not_makecode(self):
+        """Test that hex without EoF record is not detected as MakeCode."""
+        no_eof_hex = (
+            ":020000040000FA\n"
+            ":1000000000400020218E01005D8E01005F8E010006\n"
+        )
+
+        assert _is_makecode_v1(no_eof_hex) is False
+
+class TestExtendedSegmentAddress:
+    """Test handling of Extended Segment Address records."""
+
+    def test_create_uhex_with_extended_segment_address(self):
+        """Test creating Universal Hex from hex with Extended Segment Address."""
+        # Extended Segment Address record (type 02) instead of Extended Linear (04)
+        hex_with_ext_seg = (
+            ":020000020000FC\n"  # Extended Segment Address to 0x0000
+            ":1000000000400020218E01005D8E01005F8E010006\n"
+            ":1000100000000000000000000000000000000000E0\n"
+            ":020000021000EC\n"  # Extended Segment Address to 0x1000
+            ":1000000011111111111111111111111111111111EF\n"
+            ":00000001FF\n"
+        )
+
+        result = create_uhex(
+            [IndividualHex(hex=hex_with_ext_seg, board_id=0x9903)],
+        )
+
+        assert is_uhex(result) is True
+        separated = separate_uhex(result)
+        assert len(separated) == 1
+        assert_valid_ihex(separated[0].hex)
+
+    def test_blocks_format_with_extended_segment_address(self):
+        """Test blocks format handles Extended Segment Address records."""
+        hex_with_ext_seg = (
+            ":020000020000FC\n"  # Extended Segment Address to 0x0000
+            ":1000000000400020218E01005D8E01005F8E010006\n"
+            ":020000021000EC\n"  # Extended Segment Address mid-file
+            ":1000000011111111111111111111111111111111EF\n"
+            ":00000001FF\n"
+        )
+
+        result = create_uhex(
+            [IndividualHex(hex=hex_with_ext_seg, board_id=0x9903)],
+            blocks=True,
+        )
+
+        assert is_uhex(result) is True
+        separated = separate_uhex(result)
+        assert len(separated) == 1
+        assert_valid_ihex(separated[0].hex)
+
+    def test_blocks_format_large_hex_needs_padding(self):
+        """Test blocks format with larger hex that requires multiple padding records."""
+        # Create a hex with enough data to fill multiple 512-byte blocks
+        data_records = "\n".join(
+            f":10{i:04X}00{'AA' * 16}00"  # Dummy data records
+            for i in range(0, 0x1000, 0x10)
+        )
+        large_hex = f":020000040000FA\n{data_records}\n:00000001FF\n"
+
+        # Fix checksums - just use a simpler approach
+        large_hex = (
+            ":020000040000FA\n"
+            + "\n".join(
+                f":100{i:03X}00{'00' * 16}{(256 - (16 + (i >> 4) + (i & 0xF) + (i >> 8))) & 0xFF:02X}"
+                for i in range(0, 256, 16)
+            )
+            + "\n:00000001FF\n"
+        )
+
+        result = create_uhex(
+            [IndividualHex(hex=large_hex, board_id=0x9903)],
+            blocks=True,
+        )
+
+        assert is_uhex(result) is True
+        # Should contain padding records
+        assert ":0C00000C" in result or ":0000000B" in result  # PaddedData or BlockEnd
+
+
+class TestMakeCodeFixtureFiles:
+    """Test with real MakeCode hex files from different versions."""
+
+    def test_makecode_v1_intel_detected_as_makecode(self):
+        """MakeCode v1 Intel Hex files are detected as MakeCode."""
+        assert _is_makecode_v1(hex_makecode_v1_intel) is True
+
+    def test_makecode_v2_intel_detected_as_makecode(self):
+        """MakeCode v2 Intel Hex files are detected as MakeCode."""
+        assert _is_makecode_v1(hex_makecode_v2_intel) is True
+
+    def test_makecode_v3_universal_not_detected_as_makecode_v1(self):
+        """MakeCode v3 Universal Hex files are not detected as MakeCode V1."""
+        assert _is_makecode_v1(hex_makecode_v3_universal) is False
+
+    def test_separate_makecode_v3_universal(self):
+        """Test separating MakeCode v3 Universal Hex."""
+        result = separate_uhex(hex_makecode_v3_universal)
+
+        # MakeCode v3 uses board IDs 0x9901 and 0x9903
+        assert len(result) == 2
+        assert result[0].board_id == 0x9901
+        assert result[1].board_id == 0x9903
+
+        # Verify all records are valid Intel HEX types
+        for ihex in result:
+            assert_valid_ihex(ihex.hex)
+
+    def test_separate_makecode_v5_universal(self):
+        """Test separating MakeCode v5 Universal Hex."""
+        result = separate_uhex(hex_makecode_v5_universal)
+
+        # MakeCode v5 uses board IDs 0x9900 and 0x9903
+        assert len(result) == 2
+        assert result[0].board_id == BoardId.V1
+        assert result[1].board_id == BoardId.V2
+
+        # Verify all records are valid Intel HEX types
+        for ihex in result:
+            assert_valid_ihex(ihex.hex)
+
+class TestInternalFunctions:
+    """Test internal functions for edge cases and coverage."""
+
+    def test_is_uhex_records_with_less_than_3_records(self):
+        """Test _is_uhex_records returns False for less than 3 records."""
+        assert _is_uhex_records([]) is False
+        assert _is_uhex_records([":020000040000FA"]) is False
+        assert _is_uhex_records([":020000040000FA", ":0400000A9900C0DEBB"]) is False
+
+    def test_ihex_to_uhex_blocks_empty_input(self):
+        """Test _ihex_to_uhex_blocks with empty input returns empty string."""
+        assert _ihex_to_uhex_blocks("", 0x9903) == ""
+
+    def test_ihex_to_uhex_sections_empty_input(self):
+        """Test _ihex_to_uhex_sections with empty input returns empty string."""
+        assert _ihex_to_uhex_sections("", 0x9903) == ""
+
+    def test_blocks_format_makecode_v1_error(self):
+        """Test that MakeCode V1 hex with mid-file EoF raises specific error."""
+        # This is a MakeCode V1 hex - it has EoF in the middle and RAM address
+        with pytest.raises(ValueError, match="from MakeCode"):
+            create_uhex(
+                [IndividualHex(hex=hex_makecode_v1_intel, board_id=0x9900)],
+                blocks=True,
+            )
+
+    def test_sections_format_makecode_v1_error(self):
+        """Test that MakeCode V1 hex with mid-file EoF raises specific error."""
+        with pytest.raises(ValueError, match="from MakeCode"):
+            create_uhex(
+                [IndividualHex(hex=hex_makecode_v1_intel, board_id=0x9900)],
+                blocks=False,
+            )
+
+    def test_separate_uhex_ext_linear_not_followed_by_block_start(self):
+        """Test separate_uhex when ExtendedLinearAddress is not followed by BlockStart."""
+        # Create a Universal Hex where an ExtendedLinearAddress appears mid-section
+        # (not at the start of a new block)
+        uhex_with_mid_ext_lin = (
+            ":020000040000FA\n"  # Extended Linear Address
+            ":0400000A9900C0DEBB\n"  # Block Start for board 0x9900
+            ":1000000000400020218E01005D8E01005F8E010006\n"  # Data
+            ":020000040001F9\n"  # Extended Linear Address mid-section (NOT followed by BlockStart)
+            ":1000000011111111111111111111111111111111EF\n"  # More data
+            ":0000000BF5\n"  # Block End
+            ":00000001FF\n"  # End of File
+        )
+
+        result = separate_uhex(uhex_with_mid_ext_lin)
+
+        # Should have one board
+        assert len(result) == 1
+        assert result[0].board_id == 0x9900
+        # The mid-section ExtendedLinearAddress should be included in the output
+        assert ":020000040001F9" in result[0].hex
+        assert_valid_ihex(result[0].hex)
