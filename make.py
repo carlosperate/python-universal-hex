@@ -50,7 +50,7 @@ def run_module(module: str, args: list[str], check: bool = True) -> int:
     cmd_printable[0] = Path(
         cmd_printable[0]
     ).name  # Just show 'python' instead of full path
-    print("\n" + "=" * 80 + f"\n$ {' '.join(cmd_printable)}\n" + "-" * 80)
+    print("\n" + "=" * 80 + f"\n$ {' '.join(cmd_printable)}\n" + "-" * 80, flush=True)
     result = subprocess.run(cmd, cwd=ROOT)
     if check and result.returncode != 0:
         sys.exit(result.returncode)
@@ -138,7 +138,7 @@ def check() -> None:
     """Run all checks (lint, typecheck, test)."""
     # Information about the environment
     print(f"Python {platform.python_version()}: {sys.executable}")
-    print(f"Site-packages: {site.getsitepackages()}")
+    print(f"Site-packages: {site.getsitepackages()}", flush=True)
     lint()
     typecheck()
     format_check()
