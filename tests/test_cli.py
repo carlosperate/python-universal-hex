@@ -77,6 +77,7 @@ def test_join_mixes_option_inputs(
         return "combined"
 
     monkeypatch.setattr(cli_module, "create_uhex", fake_create_uhex)
+    monkeypatch.chdir(tmp_path)
 
     result = runner.invoke(
         cli,
@@ -196,6 +197,7 @@ def test_join_accepts_hex_board_id(
         return "combined"
 
     monkeypatch.setattr(cli_module, "create_uhex", fake_create_uhex)
+    monkeypatch.chdir(tmp_path)
 
     result = runner.invoke(cli, ["join", "-b", "0x1234", str(file_path)])
     assert result.exit_code == 0

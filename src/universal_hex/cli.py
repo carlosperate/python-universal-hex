@@ -16,15 +16,12 @@ class BoardIdType(click.ParamType):
     name = "BOARD_ID"
 
     def convert(
-        self, value: str | int, param: click.Parameter | None, ctx: click.Context | None
+        self, value: str, param: click.Parameter | None, ctx: click.Context | None
     ) -> int:
-        if isinstance(value, int):
-            board_id = value
-        else:
-            try:
-                board_id = int(value, 0)  # base 0 auto-detects hex (0x) or decimal
-            except ValueError:
-                self.fail(f"{value!r} is not a valid integer.", param, ctx)
+        try:
+            board_id = int(value, 0)  # base 0 auto-detects hex (0x) or decimal
+        except ValueError:
+            self.fail(f"{value!r} is not a valid integer.", param, ctx)
         if not 0 <= board_id <= 65535:
             self.fail(f"{board_id} is not in the range 0 to 65535.", param, ctx)
         return board_id
@@ -123,7 +120,8 @@ def join(
 
     universal_hex = create_uhex(hexes)
     uhex_file = Path("universal.hex")
-    uhex_file.write_text(universal_hex, encoding="ascii", newline="\n")
+    with uhex_file.open("w", encoding="ascii", newline="\n") as handle:
+        handle.write(universal_hex)
     click.echo(f"Universal Hex written to: {uhex_file}")
 
 
