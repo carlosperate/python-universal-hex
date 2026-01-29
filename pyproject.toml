@@ -1,14 +1,14 @@
 [project]
 name = "universal-hex"
 version = "0.1.0"
-description = "Create and process micro:bit Universal Hex files"
+description = "Create and split micro:bit Universal Hex files"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"
 authors = [{ name = "Carlos Pereira Atencio", email = "carlosperate@embeddedlog.com" }]
 keywords = ["microbit", "hex", "intel-hex", "universal-hex"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -17,12 +17,21 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Embedded Systems",
 ]
+dependencies = [
+    "click>=8.1,<9",
+]
+
+[project.scripts]
+uhex = "universal_hex.cli:cli"
 
 [project.urls]
 Homepage = "https://github.com/carlosperate/python-universal-hex"
-Repository = "https://github.com/carlosperate/python-universal-hex"
+Repository = "https://github.com/carlosperate/python-universal-hex.git"
+Issues = "https://github.com/carlosperate/python-universal-hex/issues"
+Changelog = "https://github.com/carlosperate/python-universal-hex/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["uv_build>=0.9.24"]
