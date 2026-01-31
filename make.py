@@ -98,14 +98,12 @@ def lint() -> None:
 @command
 def format() -> None:
     """Run code formatters (ruff)."""
-    run_module("ruff", ["check", "--fix"] + CHECK_PATHS)
     run_module("ruff", ["format"] + CHECK_PATHS)
 
 
 @command
 def format_check() -> None:
     """Check code formatting without making changes."""
-    run_module("ruff", ["check"] + CHECK_PATHS)
     run_module("ruff", ["format", "--check", "--diff"] + CHECK_PATHS)
 
 
