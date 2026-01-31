@@ -31,7 +31,7 @@ def test_join_non_repeatable_options_fail(
     runner: CliRunner, tmp_path: Path, option: str
 ) -> None:
     file_path = tmp_path / "file.hex"
-    file_path.write_text(":00000001FF\n", encoding="utf-8")
+    file_path.write_text(":00000001FF\n", encoding="ascii")
 
     result = runner.invoke(
         cli, ["join", option, str(file_path), option, str(file_path)]
@@ -42,7 +42,7 @@ def test_join_non_repeatable_options_fail(
 
 def test_join_rejects_non_hex_extension(runner: CliRunner, tmp_path: Path) -> None:
     file_path = tmp_path / "file.txt"
-    file_path.write_text(":00000001FF\n", encoding="utf-8")
+    file_path.write_text(":00000001FF\n", encoding="ascii")
 
     result = runner.invoke(cli, ["join", "--v1", str(file_path)])
     assert result.exit_code == 2
@@ -51,7 +51,7 @@ def test_join_rejects_non_hex_extension(runner: CliRunner, tmp_path: Path) -> No
 
 def test_join_rejects_out_of_range_board_id(runner: CliRunner, tmp_path: Path) -> None:
     file_path = tmp_path / "file.hex"
-    file_path.write_text(":00000001FF\n", encoding="utf-8")
+    file_path.write_text(":00000001FF\n", encoding="ascii")
 
     result = runner.invoke(cli, ["join", "-b", "70000", str(file_path)])
     assert result.exit_code == 2
@@ -66,9 +66,9 @@ def test_join_mixes_option_inputs(
     custom_path = tmp_path / "custom.hex"
     v2_path = tmp_path / "v2.hex"
 
-    v1_path.write_text("v1", encoding="utf-8")
-    custom_path.write_text("custom", encoding="utf-8")
-    v2_path.write_text("v2", encoding="utf-8")
+    v1_path.write_text("v1", encoding="ascii")
+    custom_path.write_text("custom", encoding="ascii")
+    v2_path.write_text("v2", encoding="ascii")
 
     captured: dict[str, object] = {}
 
@@ -107,7 +107,7 @@ def test_separate_writes_files_and_outputs_paths(
     runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     input_path = tmp_path / "input.hex"
-    input_path.write_text("content", encoding="utf-8")
+    input_path.write_text("content", encoding="ascii")
 
     outputs = [
         IndividualHex(hex="v1-data\n", board_id=BoardId.V1),
@@ -126,8 +126,8 @@ def test_separate_writes_files_and_outputs_paths(
     out_v1 = tmp_path / "input-board-0x9900.hex"
     out_custom = tmp_path / "input-board-0x1234.hex"
 
-    assert out_v1.read_text(encoding="utf-8") == "v1-data\n"
-    assert out_custom.read_text(encoding="utf-8") == "custom\n"
+    assert out_v1.read_text(encoding="ascii") == "v1-data\n"
+    assert out_custom.read_text(encoding="ascii") == "custom\n"
 
     assert str(out_v1) in result.output
     assert str(out_custom) in result.output
@@ -135,7 +135,7 @@ def test_separate_writes_files_and_outputs_paths(
 
 def test_separate_requires_hex_extension(runner: CliRunner, tmp_path: Path) -> None:
     input_path = tmp_path / "input.bin"
-    input_path.write_text("content", encoding="utf-8")
+    input_path.write_text("content", encoding="ascii")
 
     result = runner.invoke(cli, ["separate", str(input_path)])
     assert result.exit_code == 2
@@ -147,7 +147,7 @@ def test_join_rejects_v1_with_matching_board_id(
 ) -> None:
     """Test --v1 cannot be used with -b using BoardId.V1 (0x9900)."""
     file_path = tmp_path / "file.hex"
-    file_path.write_text(":00000001FF\n", encoding="utf-8")
+    file_path.write_text(":00000001FF\n", encoding="ascii")
 
     result = runner.invoke(
         cli, ["join", "--v1", str(file_path), "-b", "39168", str(file_path)]
@@ -161,7 +161,7 @@ def test_join_rejects_v2_with_matching_board_id(
 ) -> None:
     """Test --v2 cannot be used with -b using BoardId.V2 (0x9903)."""
     file_path = tmp_path / "file.hex"
-    file_path.write_text(":00000001FF\n", encoding="utf-8")
+    file_path.write_text(":00000001FF\n", encoding="ascii")
 
     result = runner.invoke(
         cli, ["join", "--v2", str(file_path), "-b", "39171", str(file_path)]
@@ -173,7 +173,7 @@ def test_join_rejects_v2_with_matching_board_id(
 def test_join_rejects_duplicate_board_ids(runner: CliRunner, tmp_path: Path) -> None:
     """Test that the same board ID cannot be provided twice via -b."""
     file_path = tmp_path / "file.hex"
-    file_path.write_text(":00000001FF\n", encoding="utf-8")
+    file_path.write_text(":00000001FF\n", encoding="ascii")
 
     result = runner.invoke(
         cli,
@@ -188,7 +188,7 @@ def test_join_accepts_hex_board_id(
 ) -> None:
     """Test -b accepts hexadecimal board IDs like 0x1234."""
     file_path = tmp_path / "file.hex"
-    file_path.write_text("hex-content", encoding="utf-8")
+    file_path.write_text("hex-content", encoding="ascii")
 
     captured: dict[str, object] = {}
 
@@ -213,7 +213,7 @@ def test_join_rejects_hex_board_id_out_of_range(
 ) -> None:
     """Test -b rejects hex board IDs outside 0-65535 range."""
     file_path = tmp_path / "file.hex"
-    file_path.write_text(":00000001FF\n", encoding="utf-8")
+    file_path.write_text(":00000001FF\n", encoding="ascii")
 
     result = runner.invoke(cli, ["join", "-b", "0x10000", str(file_path)])
     assert result.exit_code == 2
@@ -225,8 +225,50 @@ def test_join_rejects_invalid_board_id_string(
 ) -> None:
     """Test -b rejects non-numeric board ID strings."""
     file_path = tmp_path / "file.hex"
-    file_path.write_text(":00000001FF\n", encoding="utf-8")
+    file_path.write_text(":00000001FF\n", encoding="ascii")
 
     result = runner.invoke(cli, ["join", "-b", "notanumber", str(file_path)])
     assert result.exit_code == 2
     assert "is not a valid integer" in result.output
+
+
+def test_join_with_custom_output_file(
+    runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test --output flag writes to custom file path."""
+    file_path = tmp_path / "file.hex"
+    output_path = tmp_path / "custom_output.hex"
+    file_path.write_text("hex-content", encoding="ascii")
+
+    def fake_create_uhex(hexes: list[IndividualHex]) -> str:
+        return "universal-content"
+
+    monkeypatch.setattr(cli_module, "create_uhex", fake_create_uhex)
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(
+        cli, ["join", "--v1", str(file_path), "-o", str(output_path)]
+    )
+    assert result.exit_code == 0
+    assert f"Universal Hex written to: {output_path}" in result.output
+    assert output_path.read_text(encoding="ascii") == "universal-content"
+
+
+def test_join_with_default_output_file(
+    runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test default output file is universal.hex when --output not provided."""
+    file_path = tmp_path / "file.hex"
+    default_output = tmp_path / "universal.hex"
+    file_path.write_text("hex-content", encoding="ascii")
+
+    def fake_create_uhex(hexes: list[IndividualHex]) -> str:
+        return "universal-content"
+
+    monkeypatch.setattr(cli_module, "create_uhex", fake_create_uhex)
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(cli, ["join", "--v1", str(file_path)])
+    assert result.exit_code == 0
+    assert "Universal Hex written to: universal.hex" in result.output
+    assert default_output.read_text(encoding="ascii") == "universal-content"

@@ -70,10 +70,19 @@ def cli() -> None:
     multiple=True,
     help="Board ID (decimal or hex) and Intel Hex file (repeatable).",
 )
+@click.option(
+    "-o",
+    "--output",
+    "output_file",
+    type=click.Path(path_type=Path),
+    default="universal.hex",
+    help="Output file path for the Universal Hex (default: universal.hex).",
+)
 def join(
     v1_files: tuple[Path, ...],
     v2_files: tuple[Path, ...],
     board_files: tuple[tuple[int, Path], ...],
+    output_file: Path,
 ) -> None:
     """Join Intel Hex files into a Universal Hex."""
     # Validate option combinations
@@ -109,17 +118,17 @@ def join(
     # For predictable ordering: V1 first, then V2, then board-files.
     hexes: list[IndividualHex] = []
     for path in v1_files:
-        content = path.read_text(encoding="utf-8")
+        content = path.read_text(encoding="ascii")
         hexes.append(IndividualHex(hex=content, board_id=BoardId.V1))
     for path in v2_files:
-        content = path.read_text(encoding="utf-8")
+        content = path.read_text(encoding="ascii")
         hexes.append(IndividualHex(hex=content, board_id=BoardId.V2))
     for board_id, path in board_files:
-        content = path.read_text(encoding="utf-8")
+        content = path.read_text(encoding="ascii")
         hexes.append(IndividualHex(hex=content, board_id=board_id))
 
     universal_hex = create_uhex(hexes)
-    uhex_file = Path("universal.hex")
+    uhex_file = output_file
     with uhex_file.open("w", encoding="ascii", newline="\n") as handle:
         handle.write(universal_hex)
     click.echo(f"Universal Hex written to: {uhex_file}")
