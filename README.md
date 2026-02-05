@@ -1,5 +1,9 @@
 # Python Universal Hex Library
 
+[![Test](https://github.com/carlosperate/python-universal-hex/actions/workflows/test.yml/badge.svg)](https://github.com/carlosperate/python-universal-hex/actions/workflows/test.yml)
+[![PyPI versions](https://img.shields.io/pypi/pyversions/universal-hex.svg)](https://pypi.org/project/universal-hex/)
+[![PyPI - License](https://img.shields.io/pypi/l/universal-hex.svg)](https://github.com/carlosperate/python-universal-hex/blob/main/LICENSE)
+
 A Python library to create and process micro:bit Universal Hex files.
 
 Universal Hex is a superset of the Intel Hex format that can contain data for

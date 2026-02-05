@@ -39,6 +39,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "mini-racer>=0.12.4",
     "mypy>=1.0.0",
     "pytest>=8.0.0",
     "pytest-cov>=4.0.0",
